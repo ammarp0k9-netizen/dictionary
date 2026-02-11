@@ -29,13 +29,26 @@
             box-shadow: 0 15px 35px rgba(0,0,0,0.1); 
         }
 
-        /* العنوان كبرناه وخليناه "القاموس" فقط */
         h2 { 
             text-align: center; 
             color: #2c3e50; 
             font-size: 2.2rem; 
             margin-top: 0; 
             margin-bottom: 20px;
+        }
+
+        /* العداد */
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: #f9f9f9;
+            padding: 10px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            font-weight: bold;
+            color: #7f8c8d;
+            border: 1px solid #eee;
         }
 
         .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
@@ -66,18 +79,15 @@
 
         .top-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         
-        /* النجمة بدون مربع */
         .star-btn { 
             font-size: 24px; cursor: pointer; color: #ddd; background: none; border: none; padding: 0; transition: 0.2s;
         }
         .star-btn.active { color: var(--star-color); }
-        .star-btn:hover { transform: scale(1.2); }
 
         .word-box { flex-grow: 1; text-align: right; }
         .word-text { font-weight: bold; font-size: 1.2em; color: #2c3e50; }
         .meaning-text { color: #7f8c8d; font-size: 1em; }
 
-        /* الأيقونات الدائرية */
         .actions { display: flex; gap: 8px; }
         .icon-circle {
             width: 38px; height: 38px; border-radius: 50%; border: none;
@@ -88,19 +98,17 @@
         .edit-btn { background: #eafaf1; color: #27ae60; }
         .del-btn { background: #fdedec; color: #e74c3c; }
 
-        /* ألوان التصنيفات "الزلطة" */
-        /* ألوان التصنيفات "الراقية والمطفية" */
         .cat-tag { 
             font-size: 11px; padding: 3px 10px; border-radius: 8px; 
             font-weight: bold; margin-right: 8px; color: white;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* لمسة عمق بسيطة */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1); 
         }
-        .tag-فعل { background: #e67e22; opacity: 0.85; } /* برتقالي مطفي */
-        .tag-اسم { background: #8e44ad; opacity: 0.85; } /* بنفسجي ملكي */
-        .tag-صفة { background: #27ae60; opacity: 0.85; } /* أخضر هادي */
-        .tag-أداة { background: #c0392b; opacity: 0.85; } /* أحمر غامق */
-        .tag-جمل { background: #16a085; opacity: 0.85; } /* تيل هادي */
-        .tag-عام { background: #7f8c8d; opacity: 0.85; } /* رمادي رزين */
+        .tag-فعل { background: #e67e22; opacity: 0.85; }
+        .tag-اسم { background: #8e44ad; opacity: 0.85; }
+        .tag-صفة { background: #27ae60; opacity: 0.85; }
+        .tag-أداة { background: #c0392b; opacity: 0.85; }
+        .tag-جمل { background: #16a085; opacity: 0.85; }
+        .tag-عام { background: #7f8c8d; opacity: 0.85; }
 
         .example-box { 
             font-size: 0.95em; color: #95a5a6; font-style: italic; border-top: 1px solid #f0f0f0; 
@@ -116,6 +124,11 @@
 
 <div class="container">
     <h2 id="mainTitle">القاموس</h2>
+
+    <div class="stats-bar">
+        <span id="totalCount">إجمالي الكلمات: 0</span>
+        <span id="starredCount">⭐ المفضلة: 0</span>
+    </div>
     
     <div class="input-group">
         <input type="text" id="wordInput" placeholder="الكلمة بالإنجليزي">
@@ -135,6 +148,7 @@
     <div class="toolbar">
         <button id="toolAll" class="btn-tool active-tool" onclick="setFilter('all')">الكل</button>
         <button id="toolStarred" class="btn-tool" onclick="setFilter('starred')">⭐ الصعبة</button>
+        <button id="reorderBtn" class="btn-tool" onclick="toggleReorderMode()">🔄 ترتيب يدوي</button>
     </div>
 
     <input type="text" id="searchInput" placeholder="🔎 ابحث عن كلمة، معنى أو جملة..." onkeyup="render()">
@@ -152,6 +166,7 @@
     let words = JSON.parse(localStorage.getItem('myContextDict')) || [];
     let currentFilter = 'all';
     let editId = null;
+    let isReorderMode = false; // لميزة الترتيب
 
     function addWord() {
         let w = document.getElementById('wordInput').value.trim();
@@ -218,6 +233,7 @@
     }
 
     function toggleExample(el) {
+        if(isReorderMode) return; // منع فتح المثال أثناء الترتيب
         el.classList.toggle('show-example');
     }
 
@@ -228,35 +244,68 @@
         render();
     }
 
+    // وظائف ميزة الترتيب اليدوي
+    function toggleReorderMode() {
+        isReorderMode = !isReorderMode;
+        const btn = document.getElementById('reorderBtn');
+        btn.classList.toggle('active-tool', isReorderMode);
+        btn.innerText = isReorderMode ? "✅ حفظ الترتيب" : "🔄 ترتيب يدوي";
+        if (!isReorderMode) {
+            localStorage.setItem('myContextDict', JSON.stringify(words));
+        }
+        render();
+    }
+
+    function allowDrop(ev) { ev.preventDefault(); }
+    function drag(ev, index) { ev.dataTransfer.setData("dragIndex", index); }
+    function drop(ev, dropIndex) {
+        ev.preventDefault();
+        const dragIndex = ev.dataTransfer.getData("dragIndex");
+        if (dragIndex == dropIndex) return;
+        const draggedItem = words.splice(dragIndex, 1)[0];
+        words.splice(dropIndex, 0, draggedItem);
+        render();
+    }
+
     function saveAndRender() {
         localStorage.setItem('myContextDict', JSON.stringify(words));
         render();
     }
 
     function render() {
+        updateStats();
         let query = document.getElementById('searchInput').value.toLowerCase();
         let html = '';
         let filtered = words.filter(w => (w.word.toLowerCase().includes(query) || w.meaning.includes(query) || (w.example && w.example.toLowerCase().includes(query))) && (currentFilter === 'all' || w.starred));
 
-        filtered.forEach(w => {
+        filtered.forEach((w, index) => {
+            // تفعيل السحب فقط في وضع الترتيب
+            const dragAttrs = isReorderMode ? `draggable="true" ondragstart="drag(event, ${index})" ondragover="allowDrop(event)" ondrop="drop(event, ${index})"` : '';
+            
             html += `
-                <li onclick="toggleExample(this)">
+                <li ${dragAttrs} onclick="toggleExample(this)" style="${isReorderMode ? 'cursor: move; border-style: dashed;' : ''}">
                     <div class="top-row">
                         <button class="star-btn ${w.starred ? 'active' : ''}" onclick="toggleStar(${w.id}, event)">★</button>
                         <div class="word-box">
                             <div class="word-text">${w.word} <span class="cat-tag tag-${w.category}">${w.category}</span></div>
                             <div class="meaning-text">${w.meaning}</div>
                         </div>
+                        ${isReorderMode ? '<span style="font-size:20px; color:#ccc;">☰</span>' : `
                         <div class="actions">
                             <button class="icon-circle sound-btn" onclick="playSound('${w.word}', event)">🔊</button>
                             <button class="icon-circle edit-btn" onclick="startEdit(${w.id}, event)">📝</button>
                             <button class="icon-circle del-btn" onclick="deleteWord(${w.id}, event)">×</button>
-                        </div>
+                        </div>`}
                     </div>
                     ${w.example ? `<div class="example-box"><b>Ex:</b> ${w.example}</div>` : ''}
                 </li>`;
         });
         document.getElementById('list').innerHTML = html;
+    }
+
+    function updateStats() {
+        document.getElementById('totalCount').innerText = `إجمالي الكلمات: ${words.length}`;
+        document.getElementById('starredCount').innerText = `⭐ المفضلة: ${words.filter(w => w.starred).length}`;
     }
 
     function exportData() {
